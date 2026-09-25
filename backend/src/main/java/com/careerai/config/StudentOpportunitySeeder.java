@@ -20,13 +20,20 @@ public class StudentOpportunitySeeder implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(StudentOpportunitySeeder.class);
 
     private final JobRepository jobRepository;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
-    public StudentOpportunitySeeder(JobRepository jobRepository) {
+    public StudentOpportunitySeeder(JobRepository jobRepository, org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
         this.jobRepository = jobRepository;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
     public void run(String... args) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_source_check");
+        } catch (Exception e) {
+            log.debug("jobs_source_check constraint update: {}", e.getMessage());
+        }
         seedVerifiedStudentRoles();
     }
 

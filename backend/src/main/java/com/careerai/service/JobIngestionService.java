@@ -32,7 +32,6 @@ public class JobIngestionService {
         this.classificationService = classificationService;
     }
 
-    @Transactional
     public synchronized Map<String, Object> syncAllProviders() {
         log.info("Starting Job Ingestion Pipeline across {} configured providers...", providers.size());
         int totalFetched = 0;
@@ -57,84 +56,90 @@ public class JobIngestionService {
                 totalFetched += rawJobs.size();
 
                 for (NormalizedJobDto dto : rawJobs) {
-                    // 1. Validation Step
-                    if (!isValidJob(dto)) {
-                        totalInvalid++;
-                        continue;
-                    }
-
-                    currentRunSourceJobIds.add(dto.getSourceJobId());
-
-                    // 2. Classify accurately with JobClassificationService
-                    JobClassificationService.ClassificationResult classRes =
-                            classificationService.classify(dto.getTitle(), dto.getDescription(), dto.getEmploymentType());
-
-                    // 3. Deduplication Step (by source + sourceJobId, or company + title + location)
-                    Optional<Job> existingOpt = findExistingJob(dto);
-
-                    if (existingOpt.isPresent()) {
-                        Job existing = existingOpt.get();
-                        // Update existing job
-                        existing.setTitle(dto.getTitle());
-                        existing.setDescription(dto.getDescription());
-                        existing.setApplicationUrl(dto.getApplicationUrl());
-                        existing.setSkills(dto.getSkills());
-                        existing.setLastFetchedAt(LocalDateTime.now());
-                        existing.setIsActive(true);
-                        existing.setExperienceLevel(classRes.getExperienceLevel());
-                        existing.setEmploymentType(classRes.getEmploymentType());
-                        existing.setExperienceCategory(classRes.getExperienceCategory());
-                        existing.setTargetAcademicYears(classRes.getTargetAcademicYears());
-                        existing.setTargetBatches(classRes.getTargetBatches());
-
-                        if (existing.getSource() != dto.getSource()) {
-                            existing.setIsMultiSource(true);
-                            String other = existing.getOtherSources();
-                            if (other == null || other.isEmpty()) {
-                                existing.setOtherSources(dto.getSource().name());
-                            } else if (!other.contains(dto.getSource().name())) {
-                                existing.setOtherSources(other + ", " + dto.getSource().name());
-                            }
+                    try {
+                        // 1. Validation Step
+                        if (!isValidJob(dto)) {
+                            totalInvalid++;
+                            continue;
                         }
 
-                        jobRepository.save(existing);
-                        totalUpdated++;
-                        totalDuplicates++;
-                    } else {
-                        // 4. New Job Ingestion
-                        Job newJob = new Job(
-                                null,
-                                dto.getSource(),
-                                dto.getSourceJobId(),
-                                dto.getSourceUrl(),
-                                dto.getTitle(),
-                                dto.getCompany(),
-                                dto.getCompanyLogo(),
-                                dto.getDescription(),
-                                dto.getLocation(),
-                                dto.getCountry(),
-                                classRes.getEmploymentType(),
-                                classRes.getExperienceLevel(),
-                                dto.getSkills(),
-                                dto.getSalaryMin(),
-                                dto.getSalaryMax(),
-                                dto.getSalaryCurrency(),
-                                dto.getSalaryPeriod(),
-                                dto.getPostedDate() != null ? dto.getPostedDate() : LocalDateTime.now(),
-                                dto.getDeadline(),
-                                dto.getApplicationUrl(),
-                                dto.getRemoteType(),
-                                dto.getIsActive() != null ? dto.getIsActive() : true,
-                                LocalDateTime.now(),
-                                false,
-                                null
-                        );
-                        newJob.setExperienceCategory(classRes.getExperienceCategory());
-                        newJob.setTargetAcademicYears(classRes.getTargetAcademicYears());
-                        newJob.setTargetBatches(classRes.getTargetBatches());
+                        currentRunSourceJobIds.add(dto.getSourceJobId());
 
-                        jobRepository.save(newJob);
-                        totalSaved++;
+                        // 2. Classify accurately with JobClassificationService
+                        JobClassificationService.ClassificationResult classRes =
+                                classificationService.classify(dto.getTitle(), dto.getDescription(), dto.getEmploymentType());
+
+                        // 3. Deduplication Step (by source + sourceJobId, or company + title + location)
+                        Optional<Job> existingOpt = findExistingJob(dto);
+
+                        if (existingOpt.isPresent()) {
+                            Job existing = existingOpt.get();
+                            // Update existing job
+                            existing.setTitle(dto.getTitle());
+                            existing.setDescription(dto.getDescription());
+                            existing.setApplicationUrl(dto.getApplicationUrl());
+                            existing.setApplyUrl(dto.getApplicationUrl());
+                            existing.setSkills(dto.getSkills() != null ? new java.util.ArrayList<>(dto.getSkills()) : new java.util.ArrayList<>());
+                            existing.setLastFetchedAt(LocalDateTime.now());
+                            existing.setIsActive(true);
+                            existing.setExperienceLevel(classRes.getExperienceLevel());
+                            existing.setEmploymentType(classRes.getEmploymentType());
+                            existing.setExperienceCategory(classRes.getExperienceCategory());
+                            existing.setTargetAcademicYears(classRes.getTargetAcademicYears());
+                            existing.setTargetBatches(classRes.getTargetBatches());
+
+                            if (existing.getSource() != dto.getSource()) {
+                                existing.setIsMultiSource(true);
+                                String other = existing.getOtherSources();
+                                if (other == null || other.isEmpty()) {
+                                    existing.setOtherSources(dto.getSource().name());
+                                } else if (!other.contains(dto.getSource().name())) {
+                                    existing.setOtherSources(other + ", " + dto.getSource().name());
+                                }
+                            }
+
+                            jobRepository.save(existing);
+                            totalUpdated++;
+                            totalDuplicates++;
+                        } else {
+                            // 4. New Job Ingestion
+                            Job newJob = new Job(
+                                    null,
+                                    dto.getSource(),
+                                    dto.getSourceJobId(),
+                                    dto.getSourceUrl(),
+                                    dto.getTitle(),
+                                    dto.getCompany(),
+                                    dto.getCompanyLogo(),
+                                    dto.getDescription(),
+                                    dto.getLocation(),
+                                    dto.getCountry(),
+                                    classRes.getEmploymentType(),
+                                    classRes.getExperienceLevel(),
+                                    dto.getSkills() != null ? new java.util.ArrayList<>(dto.getSkills()) : new java.util.ArrayList<>(),
+                                    dto.getSalaryMin(),
+                                    dto.getSalaryMax(),
+                                    dto.getSalaryCurrency(),
+                                    dto.getSalaryPeriod(),
+                                    dto.getPostedDate() != null ? dto.getPostedDate() : LocalDateTime.now(),
+                                    dto.getDeadline(),
+                                    dto.getApplicationUrl(),
+                                    dto.getRemoteType(),
+                                    dto.getIsActive() != null ? dto.getIsActive() : true,
+                                    LocalDateTime.now(),
+                                    false,
+                                    null
+                            );
+                            newJob.setExperienceCategory(classRes.getExperienceCategory());
+                            newJob.setTargetAcademicYears(classRes.getTargetAcademicYears());
+                            newJob.setTargetBatches(classRes.getTargetBatches());
+                            newJob.setApplyUrl(dto.getApplicationUrl());
+
+                            jobRepository.save(newJob);
+                            totalSaved++;
+                        }
+                    } catch (Exception ex) {
+                        log.warn("Skipping unpersistable job '{}' from {}: {}", dto.getTitle(), source, ex.getMessage(), ex);
                     }
                 }
             } catch (Exception e) {

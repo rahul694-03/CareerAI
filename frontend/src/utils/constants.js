@@ -38,3 +38,11 @@ export const getAcademicStageFromYear = (gradYear) => {
   if (yr <= 2026) return `Fresh Graduate (Batch ${yr})`;
   return 'Student';
 };
+
+export const JOB_SOURCES = [
+  { id: 'ALL', label: 'All Sources' },
+  { id: 'OFFICIAL_COMPANY', label: 'Official Company ATS' },
+  { id: 'LINKEDIN', label: 'LinkedIn' },
+  { id: 'INDEED', label: 'Indeed' },
+  { id: 'NAUKRI', label: 'Naukri' },
+];

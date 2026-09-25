@@ -263,11 +263,10 @@ export const JobsPage = () => {
             Official Company
           </span>
         );
-      case 'PARTNER':
+      case 'NAUKRI':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-            <ShieldCheck className="w-3 h-3" />
-            Licensed Partner
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+            Naukri
           </span>
         );
       case 'INDEED':
@@ -278,7 +277,7 @@ export const JobsPage = () => {
         );
       case 'LINKEDIN':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
             LinkedIn
           </span>
         );
@@ -660,11 +659,11 @@ export const JobsPage = () => {
                 }}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
-                <option value="ALL">All Authorized Sources</option>
-                <option value="OFFICIAL_COMPANY">Official Company Portals (Greenhouse/Lever)</option>
-                <option value="PARTNER">Licensed Partner Feed</option>
-                <option value="INDEED">Indeed (Authorized)</option>
-                <option value="LINKEDIN">LinkedIn (Authorized)</option>
+                <option value="ALL">All Sources (ATS, LinkedIn, Indeed, Naukri)</option>
+                <option value="OFFICIAL_COMPANY">Official Company ATS (Greenhouse / Lever)</option>
+                <option value="LINKEDIN">LinkedIn Direct Apply</option>
+                <option value="INDEED">Indeed India Direct</option>
+                <option value="NAUKRI">Naukri Direct</option>
               </select>
             </div>
 

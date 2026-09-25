@@ -29,16 +29,16 @@ public class Job {
     @Column(name = "source", length = 32)
     private JobSource source = JobSource.OFFICIAL_COMPANY;
 
-    @Column(name = "source_job_id")
+    @Column(name = "source_job_id", length = 512)
     private String sourceJobId;
 
-    @Column(name = "source_url", length = 1024)
+    @Column(name = "source_url", length = 2048)
     private String sourceUrl;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 512)
     private String title;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 512)
     private String company;
 
     @Column(name = "company_logo", length = 1024)
@@ -47,10 +47,10 @@ public class Job {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 1024)
     private String location;
 
-    @Column(name = "country", length = 64)
+    @Column(name = "country", length = 128)
     private String country = "India";
 
     @Enumerated(EnumType.STRING)
@@ -64,10 +64,10 @@ public class Job {
     @Column(name = "experience_category", length = 32)
     private String experienceCategory; // FRESHER, SENIOR, MID_LEVEL
 
-    @Column(name = "target_academic_years", length = 255)
+    @Column(name = "target_academic_years", length = 512)
     private String targetAcademicYears;
 
-    @Column(name = "target_batches", length = 128)
+    @Column(name = "target_batches", length = 255)
     private String targetBatches;
 
     @Column(name = "job_type")
