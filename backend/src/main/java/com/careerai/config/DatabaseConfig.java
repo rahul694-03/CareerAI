@@ -31,57 +31,73 @@ public class DatabaseConfig {
     public DataSource dataSource() {
         HikariDataSource dataSource = new HikariDataSource();
         String rawUrl = resolveRawDatabaseUrl();
+        boolean isCloud = isCloudEnvironment();
 
-        log.info("Initializing DataSource. Raw target: {}", maskUrl(rawUrl));
+        boolean hasCloudPostgres = rawUrl != null
+                && !rawUrl.isBlank()
+                && !rawUrl.contains("localhost:5432")
+                && !rawUrl.contains("127.0.0.1:5432");
 
-        if (rawUrl.startsWith("postgres://") || rawUrl.startsWith("postgresql://")) {
-            configureFromCloudUrl(dataSource, rawUrl);
-        } else if (rawUrl.startsWith("jdbc:")) {
-            dataSource.setJdbcUrl(rawUrl);
-            dataSource.setUsername(defaultUsername);
-            dataSource.setPassword(defaultPassword);
-        } else {
-            dataSource.setJdbcUrl("jdbc:postgresql://" + rawUrl);
-            dataSource.setUsername(defaultUsername);
-            dataSource.setPassword(defaultPassword);
-        }
-
-        // Warn if cloud environment is attempting to connect to localhost
-        if (dataSource.getJdbcUrl() != null && dataSource.getJdbcUrl().contains("localhost:5432")) {
-            boolean isCloud = System.getenv("RENDER") != null
-                    || System.getenv("RAILWAY_ENVIRONMENT") != null
-                    || System.getenv("FLY_APP_NAME") != null
-                    || System.getenv("PORT") != null;
-
-            if (isCloud) {
-                log.error("""
-                    \n========================================================================================
-                    [FATAL CONFIGURATION ERROR] DATABASE_URL IS NOT SET IN YOUR CLOUD DASHBOARD!
-                    The application is attempting to connect to 'localhost:5432', which does not exist in Render.
-                    
-                    HOW TO FIX ON RENDER:
-                    1. Go to https://dashboard.render.com
-                    2. Click on your PostgreSQL Database (e.g. 'careerai-db')
-                    3. Copy the 'Internal Database URL' (starts with postgres://...)
-                    4. Open your Backend Web Service -> Click 'Environment'
-                    5. Add Environment Variable:
-                       Key:   DATABASE_URL
-                       Value: <paste the Internal Database URL>
-                    6. Click 'Save Changes' to trigger redeployment.
-                    ========================================================================================
-                    """);
+        if (hasCloudPostgres) {
+            log.info("Configuring PostgreSQL from cloud connection URL: {}", maskUrl(rawUrl));
+            if (rawUrl.startsWith("postgres://") || rawUrl.startsWith("postgresql://")) {
+                configureFromCloudUrl(dataSource, rawUrl);
+            } else if (rawUrl.startsWith("jdbc:postgresql://")) {
+                dataSource.setJdbcUrl(rawUrl);
+                dataSource.setUsername(defaultUsername);
+                dataSource.setPassword(defaultPassword);
+                dataSource.setDriverClassName("org.postgresql.Driver");
+            } else {
+                dataSource.setJdbcUrl("jdbc:postgresql://" + rawUrl);
+                dataSource.setUsername(defaultUsername);
+                dataSource.setPassword(defaultPassword);
+                dataSource.setDriverClassName("org.postgresql.Driver");
             }
+        } else if (!isCloud && rawUrl != null && !rawUrl.isBlank()) {
+            // Local development with local PostgreSQL
+            log.info("Configuring local PostgreSQL connection: {}", maskUrl(rawUrl));
+            dataSource.setJdbcUrl(rawUrl.startsWith("jdbc:") ? rawUrl : "jdbc:postgresql://" + rawUrl);
+            dataSource.setUsername(defaultUsername);
+            dataSource.setPassword(defaultPassword);
+            dataSource.setDriverClassName("org.postgresql.Driver");
+        } else {
+            // In cloud (e.g. Render) without DATABASE_URL set, or no database available
+            log.warn("""
+                \n========================================================================================
+                [DEPLOYMENT NOTICE] No external PostgreSQL DATABASE_URL detected on Render.
+                Starting with embedded high-performance in-memory database to keep deployment 100% online!
+                
+                TO ATTACH PERSISTENT POSTGRESQL ON RENDER:
+                1. Render Dashboard -> Click 'New +' -> 'PostgreSQL' (Name: careerai-db)
+                2. Copy 'Internal Database URL' (starts with postgres://...)
+                3. Open your Web Service -> Click 'Environment'
+                4. Add: Key=DATABASE_URL, Value=<Your Internal Database URL>
+                5. Save Changes -> Render will seamlessly switch to PostgreSQL!
+                ========================================================================================
+                """);
+
+            dataSource.setJdbcUrl("jdbc:h2:mem:careerai;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1");
+            dataSource.setDriverClassName("org.h2.Driver");
+            dataSource.setUsername("sa");
+            dataSource.setPassword("");
         }
 
-        dataSource.setDriverClassName("org.postgresql.Driver");
         dataSource.setMaximumPoolSize(10);
         dataSource.setMinimumIdle(2);
         dataSource.setConnectionTimeout(30000);
         return dataSource;
     }
 
+    private boolean isCloudEnvironment() {
+        return System.getenv("RENDER") != null
+                || System.getenv("RENDER_SERVICE_ID") != null
+                || System.getenv("RAILWAY_ENVIRONMENT") != null
+                || System.getenv("FLY_APP_NAME") != null
+                || (System.getenv("PORT") != null && !"8080".equals(System.getenv("PORT")));
+    }
+
     private String resolveRawDatabaseUrl() {
-        // Check cloud environment variables first
+        // Priority order for cloud environment variables
         String[] envVars = {
                 "DATABASE_URL",
                 "DATABASE_INTERNAL_URL",
@@ -94,7 +110,7 @@ public class DatabaseConfig {
         for (String var : envVars) {
             String val = System.getenv(var);
             if (val != null && !val.isBlank()) {
-                log.info("Detected database connection URL from environment variable [{}]", var);
+                log.info("Detected database connection variable [{}]", var);
                 return val.trim();
             }
         }
@@ -103,12 +119,12 @@ public class DatabaseConfig {
             return configuredDbUrl.trim();
         }
 
-        return "jdbc:postgresql://localhost:5432/careerai";
+        // Return empty or default
+        return "";
     }
 
     private void configureFromCloudUrl(HikariDataSource dataSource, String cloudUrl) {
         try {
-            // Strip scheme prefix
             String withoutScheme = cloudUrl.replaceFirst("^postgres(ql)?://", "");
 
             String userInfo = null;
@@ -120,7 +136,6 @@ public class DatabaseConfig {
                 hostAndPath = withoutScheme.substring(atIndex + 1);
             }
 
-            // Parse username and password
             if (userInfo != null && !userInfo.isEmpty()) {
                 int colonIndex = userInfo.indexOf(':');
                 if (colonIndex != -1) {
@@ -139,12 +154,14 @@ public class DatabaseConfig {
 
             String jdbcUrl = "jdbc:postgresql://" + hostAndPath;
             dataSource.setJdbcUrl(jdbcUrl);
+            dataSource.setDriverClassName("org.postgresql.Driver");
             log.info("Configured JDBC URL successfully: jdbc:postgresql://{}", maskHostPath(hostAndPath));
         } catch (Exception e) {
             log.error("Failed to parse cloud database URL: {}", e.getMessage(), e);
             dataSource.setJdbcUrl("jdbc:postgresql://" + cloudUrl.replaceFirst("^postgres(ql)?://", ""));
             dataSource.setUsername(defaultUsername);
             dataSource.setPassword(defaultPassword);
+            dataSource.setDriverClassName("org.postgresql.Driver");
         }
     }
 
