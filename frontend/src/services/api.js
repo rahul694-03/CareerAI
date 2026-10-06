@@ -2,10 +2,20 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Single-flight warmup promise to wake up sleeping cloud instances (Render free tier)
+let warmUpPromise = null;
+export const warmUpBackend = () => {
+  if (!warmUpPromise) {
+    warmUpPromise = api.get('/api/jobs/providers/status').catch(() => null);
+  }
+  return warmUpPromise;
+};
 
 api.interceptors.request.use(
   (config) => {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { warmUpBackend } from '../services/api';
 import { DEGREES, GRADUATION_YEARS, ACADEMIC_YEARS } from '../utils/constants';
 import { AlertCircle, ArrowRight, Check, GraduationCap } from 'lucide-react';
 
@@ -20,7 +21,24 @@ export const SignupPage = () => {
 
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [slowNotice, setSlowNotice] = useState(false);
   const [serverError, setServerError] = useState('');
+
+  React.useEffect(() => {
+    warmUpBackend();
+  }, []);
+
+  React.useEffect(() => {
+    let timer;
+    if (submitting) {
+      timer = setTimeout(() => {
+        setSlowNotice(true);
+      }, 3500);
+    } else {
+      setSlowNotice(false);
+    }
+    return () => clearTimeout(timer);
+  }, [submitting]);
 
   const validate = () => {
     const newErrors = {};
@@ -258,10 +276,13 @@ export const SignupPage = () => {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full mt-2 py-3 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition shadow-sm disabled:opacity-60 flex items-center justify-center gap-2"
+            className="w-full mt-2 py-3 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition shadow-sm disabled:opacity-75 flex items-center justify-center gap-2"
           >
             {submitting ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <div className="flex items-center gap-2.5">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>{slowNotice ? 'Connecting to cloud server...' : 'Creating Account...'}</span>
+              </div>
             ) : (
               <>
                 <span>Create Account</span>
@@ -269,6 +290,13 @@ export const SignupPage = () => {
               </>
             )}
           </button>
+
+          {slowNotice && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-800 text-xs text-center flex items-center justify-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+              <span>Waking up free-tier cloud server (takes ~15-20s on first start). Please wait a moment...</span>
+            </div>
+          )}
         </form>
 
         <div className="mt-6 pt-5 border-t border-slate-100 text-center">

@@ -5,9 +5,21 @@ import { userService } from '../services/userService';
 export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('careerai_token') || null);
-  const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState(() => localStorage.getItem('careerai_token') || null);
+  const [user, setUser] = useState(() => {
+    try {
+      const cached = localStorage.getItem('careerai_user');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  // If we already have both token and cached user, don't show full-screen blocking loader
+  const [loading, setLoading] = useState(() => {
+    const storedToken = localStorage.getItem('careerai_token');
+    const storedUser = localStorage.getItem('careerai_user');
+    return !!(storedToken && !storedUser);
+  });
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -17,12 +29,16 @@ export const AuthProvider = ({ children }) => {
           const res = await userService.getMe();
           if (res && res.success && res.data) {
             setUser(res.data);
+            localStorage.setItem('careerai_user', JSON.stringify(res.data));
           } else {
             logout();
           }
         } catch (err) {
-          console.error('Session validation failed:', err);
-          logout();
+          console.error('Session validation check:', err);
+          // Only log out if definitely rejected with 401 (not transient network delay)
+          if (err?.response?.status === 401) {
+            logout();
+          }
         }
       }
       setLoading(false);
@@ -36,6 +52,7 @@ export const AuthProvider = ({ children }) => {
     if (res && res.success && res.data) {
       const { token: receivedToken, user: receivedUser } = res.data;
       localStorage.setItem('careerai_token', receivedToken);
+      localStorage.setItem('careerai_user', JSON.stringify(receivedUser));
       setToken(receivedToken);
       setUser(receivedUser);
       return res.data;
@@ -48,6 +65,7 @@ export const AuthProvider = ({ children }) => {
     if (res && res.success && res.data) {
       const { token: receivedToken, user: receivedUser } = res.data;
       localStorage.setItem('careerai_token', receivedToken);
+      localStorage.setItem('careerai_user', JSON.stringify(receivedUser));
       setToken(receivedToken);
       setUser(receivedUser);
       return res.data;
@@ -64,6 +82,7 @@ export const AuthProvider = ({ children }) => {
 
   const updateUser = (updatedUserData) => {
     setUser(updatedUserData);
+    localStorage.setItem('careerai_user', JSON.stringify(updatedUserData));
   };
 
   const value = {

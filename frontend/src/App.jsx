@@ -15,7 +15,13 @@ import { InterviewPrepPage } from './pages/InterviewPrepPage';
 import { ResumePage } from './pages/ResumePage';
 import { ProfilePage } from './pages/ProfilePage';
 
+import { warmUpBackend } from './services/api';
+
 function App() {
+  React.useEffect(() => {
+    warmUpBackend();
+  }, []);
+
   return (
     <AuthProvider>
       <BrowserRouter>

@@ -65,12 +65,17 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         String normalizedEmail = request.getEmail().trim().toLowerCase();
 
-        authenticationManager.authenticate(
+        org.springframework.security.core.Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(normalizedEmail, request.getPassword())
         );
 
-        User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        User user;
+        if (authentication.getPrincipal() instanceof com.careerai.security.UserPrincipal userPrincipal) {
+            user = userPrincipal.getUser();
+        } else {
+            user = userRepository.findByEmail(normalizedEmail)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        }
 
         String token = jwtUtils.generateToken(user.getEmail());
 

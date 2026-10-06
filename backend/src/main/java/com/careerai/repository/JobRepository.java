@@ -29,6 +29,8 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
 
     List<Job> findByCompanyIgnoreCase(String company);
 
+    long countByExperienceCategoryIsNull();
+
     @org.springframework.transaction.annotation.Transactional
     void deleteBySource(JobSource source);
 }

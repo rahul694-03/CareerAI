@@ -30,19 +30,23 @@ export const DashboardPage = () => {
 
   const loadDashboardData = async () => {
     try {
-      const resumeRes = await resumeService.getMyResume();
-      if (resumeRes.success && resumeRes.data) {
+      // Parallelize resume retrieval and application count requests
+      const [resumeResult, appResult] = await Promise.allSettled([
+        resumeService.getMyResume(),
+        applicationService.getApplicationCount(),
+      ]);
+
+      if (appResult.status === 'fulfilled' && appResult.value?.success && appResult.value.data !== undefined) {
+        setApplicationsCount(appResult.value.data);
+      }
+
+      if (resumeResult.status === 'fulfilled' && resumeResult.value?.success && resumeResult.value.data) {
         setHasResume(true);
-        setResumeName(resumeRes.data.fileName);
+        setResumeName(resumeResult.value.data.fileName);
         const matchRes = await jobService.getMatchedJobs();
         if (matchRes.success) {
           setMatchedJobsCount(matchRes.data?.length || 0);
         }
-      }
-
-      const appRes = await applicationService.getApplicationCount();
-      if (appRes.success && appRes.data !== undefined) {
-        setApplicationsCount(appRes.data);
       }
     } catch (err) {
       console.error('Dashboard data load error:', err);
